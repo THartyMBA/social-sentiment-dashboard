@@ -18,6 +18,7 @@ import numpy as np
 import streamlit as st
 import plotly.express as px
 from nltk.sentiment import SentimentIntensityAnalyzer
+import feedparser, time
 import nltk, os
 
 # ensure VADER lexicon (downloaded once, cached)
@@ -25,19 +26,28 @@ nltk.download("vader_lexicon", quiet=True)
 sia = SentimentIntensityAnalyzer()
 
 # ───────────────────────── scraping helper ───────────────────────────────
-HEADERS = {"User-agent": "sentiment-dashboard-demo"}
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    )
+}
+
 
 def fetch_reddit_posts(query, limit=100):
-    url = f"https://api.pushshift.io/reddit/search/submission/?q={query}&size={limit}"
-    res = requests.get(url, timeout=20)
-    res.raise_for_status()
-    data = res.json().get("data", [])
+    """
+    Fallback via Reddit RSS feed:
+    Parses https://www.reddit.com/search.rss?q=<query>&limit=<limit>
+    """
+    rss_url = f"https://www.reddit.com/search.rss?q={query}&limit={limit}"
+    feed = feedparser.parse(rss_url)
     posts = []
-    for post in data:
-        ts = post.get("created_utc")
-        text = (post.get("title","") + " " + post.get("selftext","")).strip()
-        if ts and text:
-            posts.append((ts, text))
+    for entry in feed.entries:
+        # published_parsed is a struct_time
+        ts = time.mktime(entry.published_parsed)
+        text = entry.title + " " + entry.get("summary","")
+        posts.append((ts, text))
     return posts
 
 def score_posts(posts):
