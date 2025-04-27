@@ -28,16 +28,16 @@ sia = SentimentIntensityAnalyzer()
 HEADERS = {"User-agent": "sentiment-dashboard-demo"}
 
 def fetch_reddit_posts(query, limit=100):
-    """Return list of (created_utc, title+selftext) tuples."""
-    url = f"https://www.reddit.com/search.json?q={query}&limit={limit}&sort=new"
-    res = requests.get(url, headers=HEADERS, timeout=20)
+    url = f"https://api.pushshift.io/reddit/search/submission/?q={query}&size={limit}"
+    res = requests.get(url, timeout=20)
     res.raise_for_status()
-    data = res.json()["data"]["children"]
+    data = res.json().get("data", [])
     posts = []
-    for child in data:
-        post = child["data"]
+    for post in data:
+        ts = post.get("created_utc")
         text = (post.get("title","") + " " + post.get("selftext","")).strip()
-        posts.append((post["created_utc"], text))
+        if ts and text:
+            posts.append((ts, text))
     return posts
 
 def score_posts(posts):
