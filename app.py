@@ -13,6 +13,7 @@ and streams a live score chart that updates on refresh.
 """
 # ───────────────────────────────────────── imports ────────────────────────
 import requests, time, datetime as dt
+from email.utils import parsedate_to_datetime
 import pandas as pd
 import numpy as np
 import streamlit as st
@@ -44,10 +45,19 @@ def fetch_reddit_posts(query, limit=100):
     feed = feedparser.parse(rss_url)
     posts = []
     for entry in feed.entries:
-        # published_parsed is a struct_time
-        ts = time.mktime(entry.published_parsed)
-        text = entry.title + " " + entry.get("summary","")
+        # Try published_parsed first, else parse the published string
+        if hasattr(entry, "published_parsed") and entry.published_parsed:
+            ts = time.mktime(entry.published_parsed)
+        elif entry.get("published"):
+            dt = parsedate_to_datetime(entry.published)
+            ts = dt.timestamp()
+        else:
+            # skip if no timestamp
+            continue
+
+        text = entry.title + " " + entry.get("summary", "")
         posts.append((ts, text))
+
     return posts
 
 def score_posts(posts):
